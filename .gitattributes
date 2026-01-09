@@ -1,0 +1,5 @@
+# Ignore generated and non-code files in language stats
+*.md linguist-generated
+*.spec linguist-generated
+dist/** linguist-generated
+build/** linguist-generated
