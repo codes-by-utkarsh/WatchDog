@@ -3,4 +3,4 @@ opencv-python
 requests
 pyinstaller
 pyautogui
-psutil
+matplotlib
