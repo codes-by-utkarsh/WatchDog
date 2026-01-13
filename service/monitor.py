@@ -13,9 +13,11 @@ if not getattr(sys, 'frozen', False):
 try:
     # Try local import (if running from inside service dir)
     from camera import capture_intruder_file
+    from statistics import StatisticsManager
 except ImportError:
     # Try package import (if running from root or exe)
     from service.camera import capture_intruder_file
+    from service.statistics import StatisticsManager
 
 # --------------------------------------------------
 # PATHS (SERVICE SAFE)
@@ -32,12 +34,21 @@ else:
 
 IMAGE_DIR = os.getenv("PROGRAMDATA") or "C:\\ProgramData"
 CAPTURES_DIR = os.path.join(IMAGE_DIR, "AntiTheftCaptures")
+DB_PATH = os.path.join(CAPTURES_DIR, "watchdog_stats.db")
 
 if not os.path.exists(CAPTURES_DIR):
     try:
         os.makedirs(CAPTURES_DIR)
     except Exception as e:
         print(f"[ERROR] Could not create capture dir: {e}")
+
+# Initialize statistics manager
+stats_manager = None
+try:
+    stats_manager = StatisticsManager(DB_PATH)
+    print(f"[*] Statistics database initialized: {DB_PATH}")
+except Exception as e:
+    print(f"[WARNING] Statistics disabled: {e}")
 
 CAPTURE_COOLDOWN = 0.0  # Zero delay between possible captures
 last_capture_time = 0
@@ -115,14 +126,19 @@ def upload_worker(stop_event):
                 filepath = os.path.join(CAPTURES_DIR, filename)
                 print(f"[Attempting] {filename}")
                 
-                if send_telegram_photo(filepath):
+                success = send_telegram_photo(filepath)
+                if success:
                     print(f"[SUCCESS] Uploaded {filename}")
+                    if stats_manager:
+                        stats_manager.log_upload(filename, True)
                     try:
                         os.remove(filepath)
                     except:
                         pass
                 else:
                     print(f"[FAIL] Could not upload {filename}, retrying later.")
+                    if stats_manager:
+                        stats_manager.log_upload(filename, False, "Upload failed")
         else:
             print("[DEBUG] No internet. Waiting...")
         
@@ -137,8 +153,12 @@ def capture_intruder():
     saved_path = capture_intruder_file(CAPTURES_DIR, CAM_INDEX, prefix="alert_")
     if saved_path:
         print(f"[INFO] ✓ Captured: {saved_path}")
+        if stats_manager:
+            stats_manager.log_event("capture", "Intruder photo captured", saved_path)
     else:
         print("[ERROR] Capture failed")
+        if stats_manager:
+            stats_manager.log_event("capture_failed", "Camera capture failed")
 
 # --------------------------------------------------
 # EVENT LOG MONITOR
@@ -175,6 +195,8 @@ def monitor_failed_logins(stop_event):
                     if event.EventID == TARGET_EVENT_ID:
                         failed_count += 1
                         print(f"[ALERT] Failed login #{failed_count}")
+                        if stats_manager:
+                            stats_manager.log_event("failed_login", f"Attempt #{failed_count}")
 
                         if failed_count >= FAILED_THRESHOLD:
                             now = time.time()
