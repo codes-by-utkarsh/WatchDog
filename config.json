@@ -1,14 +1,14 @@
 {
-  "telegram": {
-    "bot_token": "bot-token-here",
-    "chat_id": "bot-chat-id"
-  },
-  "security": {
-    "failed_attempt_threshold": 2,
-    "event_id": 4625,
-    "check_interval_seconds": 1
-  },
-  "camera": {
-    "device_index": 0
-  }
+    "telegram": {
+        "bot_token": "bot-token-here",
+        "chat_id": "bot-chat-id"
+    },
+    "security": {
+        "failed_attempt_threshold": 2,
+        "event_id": 4625,
+        "check_interval_seconds": 1
+    },
+    "camera": {
+        "device_index": 0
+    }
 }
