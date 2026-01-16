@@ -130,8 +130,6 @@ schtasks /Query /TN "AntiTheft_Commander"
 
 ### Stop All
 ```powershell
-schtasks /End /TN "AntiTheft_Service"
-schtasks /End /TN "AntiTheft_Commander"
 Stop-Process -Name monitor -Force -ErrorAction SilentlyContinue
 ```
 

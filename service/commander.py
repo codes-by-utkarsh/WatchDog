@@ -11,12 +11,26 @@ from datetime import datetime
 BOT_TOKEN = None
 CHAT_ID = None
 CAPTURES_DIR = None
+stats_manager = None
 
 def init_commander(config, captures_dir):
-    global BOT_TOKEN, CHAT_ID, CAPTURES_DIR
+    global BOT_TOKEN, CHAT_ID, CAPTURES_DIR, stats_manager
     BOT_TOKEN = config['telegram']['bot_token']
     CHAT_ID = str(config['telegram']['chat_id'])
     CAPTURES_DIR = captures_dir
+    
+    # Initialize statistics manager
+    try:
+        from service.statistics import StatisticsManager
+    except ImportError:
+        from statistics import StatisticsManager
+    
+    db_path = os.path.join(captures_dir, "watchdog_stats.db")
+    try:
+        stats_manager = StatisticsManager(db_path)
+        print(f"[*] Statistics manager initialized in commander")
+    except Exception as e:
+        print(f"[WARNING] Statistics disabled: {e}")
 
 def send_reply(text):
     """Send text reply to Telegram"""
@@ -48,6 +62,21 @@ def execute_command(command_text):
 
     action = cmd[0]
     print(f"[CMD] Received command: {action}")
+    
+    # Log command execution
+    success = True
+    try:
+        _execute_command_internal(action, cmd)
+    except Exception as e:
+        print(f"[ERROR] Command failed: {e}")
+        success = False
+    
+    # Log to statistics
+    if stats_manager:
+        stats_manager.log_command(action, CHAT_ID, success)
+
+def _execute_command_internal(action, cmd):
+    """Internal command execution logic"""
 
     if action == "/ping":
         send_reply("🏓 Pong! WatchDog is watching. System is online.")
@@ -136,7 +165,7 @@ def execute_command(command_text):
                 )
                 
                 current_ssid = "Unknown"
-                for line in output.split("\n"):
+                for line in output.split("\\n"):
                     line = line.strip()
                     if line.startswith("SSID"):
                         # Format: "SSID 1 : Name"
@@ -148,7 +177,7 @@ def execute_command(command_text):
                         parts = line.split(":", 1)
                         if len(parts) > 1:
                             bssid = parts[1].strip()
-                            wifi_list.append(f"📶 {current_ssid}\n   `{bssid}`")
+                            wifi_list.append(f"📶 {current_ssid}\\n   `{bssid}`")
                     elif line.startswith("Signal"):
                          # Add signal to last entry
                          if wifi_list:
@@ -165,35 +194,86 @@ def execute_command(command_text):
                     map_link = f"https://maps.google.com/?q={info['lat']},{info['lon']}"
                     
                     # Format WiFi Data (Top 8 strong signals)
-                    wifi_report = "\n".join(wifi_list[:8]) if wifi_list else "No WiFi networks found."
+                    wifi_report = "\\n".join(wifi_list[:8]) if wifi_list else "No WiFi networks found."
                     
-                    msg = (f"📍 *Detailed Location Report*\n"
-                           f"--------------------------------\n"
-                           f"🌍 *IP-Based Info*:\n"
-                           f"   City: {info['city']}\n"
-                           f"   ISP: {info['isp']}\n"
-                           f"   IP: {info['query']}\n"
-                           f"   🔗 [Google Maps]({map_link})\n\n"
-                           f"📡 *Nearby WiFi (Triangulation Data)*:\n"
-                           f"{wifi_report}\n\n"
+                    msg = (f"📍 *Detailed Location Report*\\n"
+                           f"--------------------------------\\n"
+                           f"🌍 *IP-Based Info*:\\n"
+                           f"   City: {info['city']}\\n"
+                           f"   ISP: {info['isp']}\\n"
+                           f"   IP: {info['query']}\\n"
+                           f"   🔗 [Google Maps]({map_link})\\n\\n"
+                           f"📡 *Nearby WiFi (Triangulation Data)*:\\n"
+                           f"{wifi_report}\\n\\n"
                            f"_Copy BSSIDs to Wigle.net for precise coord_")
                     send_reply(msg)
                 else:
-                    send_reply(f"❌ Geo-IP Failed. WiFi Scan:\n" + "\n".join(wifi_list[:5]))
+                    send_reply(f"❌ Geo-IP Failed. WiFi Scan:\\n" + "\\n".join(wifi_list[:5]))
             except Exception as e:
                 send_reply(f"❌ Err: {e}")
         
         threading.Thread(target=fetch_loc).start()
 
+    elif action == "/stats":
+        send_reply("📊 Generating statistics report...")
+        
+        def fetch_stats():
+            try:
+                if not stats_manager:
+                    send_reply("❌ Statistics not available")
+                    return
+                
+                stats = stats_manager.get_statistics(days=30)
+                message = stats_manager.format_stats_message(stats)
+                send_reply(message)
+            except Exception as e:
+                send_reply(f"❌ Error generating stats: {e}")
+        
+        threading.Thread(target=fetch_stats).start()
+    
+    elif action == "/chart":
+        send_reply("📈 Generating visual charts...")
+        
+        def generate_chart():
+            try:
+                if not stats_manager:
+                    send_reply("❌ Statistics not available")
+                    return
+                
+                stats = stats_manager.get_statistics(days=30)
+                chart_buffer = stats_manager.generate_chart(stats)
+                
+                if chart_buffer:
+                    # Save chart temporarily
+                    chart_path = os.path.join(CAPTURES_DIR, "stats_chart.png")
+                    with open(chart_path, "wb") as f:
+                        f.write(chart_buffer.read())
+                    
+                    send_photo(chart_path, "📊 WatchDog Security Statistics")
+                    
+                    # Clean up
+                    try:
+                        os.remove(chart_path)
+                    except:
+                        pass
+                else:
+                    send_reply("❌ Chart generation failed. Install matplotlib: pip install matplotlib")
+            except Exception as e:
+                send_reply(f"❌ Error generating chart: {e}")
+        
+        threading.Thread(target=generate_chart).start()
+
     elif action == "/help":
         help_text = (
-            "🛡️ *WatchDog Command Center*\n\n"
-            "• /ping - Check status\n"
-            "• /capture - Take photo\n"
-            "• /screen - Screenshot\n"
-            "• /locate - Get Location\n"
-            "• /lock - Lock PC\n"
-            "• /msg [text] - Show popup"
+            "🛡️ *WatchDog Command Center*\\n\\n"
+            "• /ping - Check status\\n"
+            "• /capture - Take photo\\n"
+            "• /screen - Screenshot\\n"
+            "• /locate - Get Location\\n"
+            "• /lock - Lock PC\\n"
+            "• /msg [text] - Show popup\\n"
+            "• /stats - View statistics\\n"
+            "• /chart - Visual graphs"
         )
         send_reply(help_text)
 
