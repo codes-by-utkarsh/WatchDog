@@ -26,7 +26,7 @@ SPEC_FILE = os.path.join(BASE_DIR, "monitor.spec")
 BUILD_DIR = os.path.join(BASE_DIR, "build")
 DIST_DIR = os.path.join(BASE_DIR, "dist")
 SOURCE_CONFIG = os.path.join(BASE_DIR, "config.json")
-EXE_PATH = os.path.join(DIST_DIR, "monitor.exe")
+EXE_PATH = os.path.join(DIST_DIR, "WatchDog.exe")
 DEST_CONFIG = os.path.join(DIST_DIR, "config.json")
 
 def build_exe():
@@ -102,7 +102,7 @@ def delete_existing_task():
     """Delete existing task if it exists"""
     try:
         subprocess.run(
-            ["schtasks", "/Delete", "/TN", "AntiTheftMonitor", "/F"],
+            ["schtasks", "/Delete", "/TN", "WatchDogMonitor", "/F"],
             capture_output=True,
             check=False
         )
@@ -111,7 +111,7 @@ def delete_existing_task():
 
 def create_task():
     print("\n--- Creating Startup Task (Method 1: Scheduled Task) ---")
-    task_name = "AntiTheftMonitor"
+    task_name = "WatchDogMonitor"
     
     if not is_admin():
         print("[X] Administrator privileges required!")
@@ -210,7 +210,7 @@ def add_registry_startup():
         key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path, 0, winreg.KEY_SET_VALUE)
         
         # Set the value
-        winreg.SetValueEx(key, "AntiTheftMonitor", 0, winreg.REG_SZ, f'"{EXE_PATH}"')
+        winreg.SetValueEx(key, "WatchDogMonitor", 0, winreg.REG_SZ, f'"{EXE_PATH}"')
         winreg.CloseKey(key)
         
         print("[✓] Registry startup entry created!")
@@ -226,7 +226,7 @@ def verify_task():
     print("\n--- Verifying Installation ---")
     try:
         result = subprocess.run(
-            ["schtasks", "/Query", "/TN", "AntiTheftMonitor", "/FO", "LIST"],
+            ["schtasks", "/Query", "/TN", "WatchDogMonitor", "/FO", "LIST"],
             capture_output=True,
             text=True,
             check=True

@@ -70,9 +70,12 @@ Once the **Commander** task is running (after logging in), you can send these co
 | :--- | :--- |
 | `/ping` | Check if the system is online and listening. |
 | `/capture` | Instantly take a photo using the webcam. |
+| `/listen [sec]` | 🎤 Record audio from microphone (default 5s). |
 | `/screen` | Take a silent screenshot of the desktop. |
 | `/locate` | Get location report (IP + WiFi Triangulation). |
 | `/stat` | Get System Statistics (CPU, RAM, Battery). |
+| `/ls`, `/cd` | 📂 Browse files on the system. |
+| `/download [file]` | ⬇️ Download a file from the laptop. |
 | `/lock` | Instantly lock the workstation. |
 | `/msg "text"` | Pop up a notepad message on the screen (e.g., "Hello Thief"). |
 | `/help` | Show list of available commands. |

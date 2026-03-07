@@ -1,10 +1,10 @@
 {
     "telegram": {
-        "bot_token": "8417413968:AAFvpt-3XIYrvjCsYZSzM7oLNx-sbdnsDCk",
-        "chat_id": "1179892417"
+        "bot_token": "",
+        "chat_id": ""
     },
     "security": {
-        "failed_attempt_threshold": 2,
+        "failed_attempt_threshold": 1,
         "event_id": 4625,
         "check_interval_seconds": 1
     },

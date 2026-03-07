@@ -11,9 +11,11 @@ from datetime import datetime
 BOT_TOKEN = None
 CHAT_ID = None
 CAPTURES_DIR = None
+CONFIG = None
 
 def init_commander(config, captures_dir):
-    global BOT_TOKEN, CHAT_ID, CAPTURES_DIR
+    global BOT_TOKEN, CHAT_ID, CAPTURES_DIR, CONFIG
+    CONFIG = config
     BOT_TOKEN = config['telegram']['bot_token']
     CHAT_ID = str(config['telegram']['chat_id'])
     CAPTURES_DIR = captures_dir
@@ -98,22 +100,44 @@ def execute_command(command_text):
         # Usage: /msg Hello Thief
         message = " ".join(cmd[1:])
         if message:
-            send_reply(f"📢 Opening Notepad: '{message}'")
+            send_reply(f"📢 Showing Dialog: '{message}'")
             
-            def show_notepad_msg(msg):
+            def show_vbs_msg(msg):
                 import subprocess
                 try:
-                    # Create a visible text file
-                    file_path = os.path.join(CAPTURES_DIR, "MESSAGE_FROM_OWNER.txt")
-                    with open(file_path, "w", encoding="utf-8") as f:
-                        f.write(msg)
+                    # Create a temporary VBS script
+                    vbs_path = os.path.join(CAPTURES_DIR, "message.vbs")
+                    # Escape quotes in message
+                    safe_msg = msg.replace('"', '""')
                     
-                    # Open Notepad without shell window
-                    subprocess.Popen(["notepad.exe", file_path])
+                    # Professional VBScript with Text-to-Speech and System Modal
+                    vbs_content = f'''
+                    Set Sapi = Wscript.CreateObject("SAPI.SpVoice")
+                    Sapi.Rate = 0
+                    Sapi.Volume = 100
+                    
+                    ' Announce message
+                    Sapi.Speak "Incoming Security Alert"
+                    
+                    ' Show Dialog (SystemModal + Exclamation + TopMost)
+                    ' 4096 = SystemModal (Always on top)
+                    ' 48 = Exclamation Icon
+                    MsgBox vbCrLf & "{safe_msg}" & vbCrLf & vbCrLf, 4144, "⚠️ WatchDog Security Alert"
+                    
+                    ' Read the message
+                    Sapi.Speak "{safe_msg}"
+                    '''
+                    
+                    with open(vbs_path, "w", encoding="utf-8") as f:
+                        f.write(vbs_content)
+                    
+                    # Run VBScript
+                    subprocess.Popen(["wscript", vbs_path])
+                    
                 except Exception as e:
-                    print(f"[ERROR] Failed to open notepad: {e}")
+                    print(f"[ERROR] Failed to show dialog: {e}")
 
-            threading.Thread(target=show_notepad_msg, args=(message,)).start()
+            threading.Thread(target=show_vbs_msg, args=(message,)).start()
         else:
             send_reply("⚠️ Usage: /msg [Your Message]")
             
@@ -228,15 +252,107 @@ def execute_command(command_text):
         except Exception as e:
             send_reply(f"❌ Failed to fetch stats: {e}")
 
+    elif action == "/listen":
+        duration = 5
+        if len(cmd) > 1 and cmd[1].isdigit():
+            duration = int(cmd[1])
+            if duration > 30: duration = 30 # Limit to 30s
+            
+        send_reply(f"🎤 Recording {duration}s of audio...")
+        
+        def record_audio_task(sec):
+            try:
+                import pyaudio
+                import wave
+                
+                CHUNK = 1024
+                FORMAT = pyaudio.paInt16
+                CHANNELS = 1
+                RATE = 44100
+                
+                p = pyaudio.PyAudio()
+                stream = p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
+                
+                frames = []
+                # Record
+                for i in range(0, int(RATE / CHUNK * sec)):
+                    data = stream.read(CHUNK)
+                    frames.append(data)
+                    
+                stream.stop_stream()
+                stream.close()
+                p.terminate()
+                
+                filename = f"audio_{int(time.time())}.wav"
+                filepath = os.path.join(CAPTURES_DIR, filename)
+                
+                wf = wave.open(filepath, 'wb')
+                wf.setnchannels(CHANNELS)
+                wf.setsampwidth(p.get_sample_size(FORMAT))
+                wf.setframerate(RATE)
+                wf.writeframes(b''.join(frames))
+                wf.close()
+                
+                # Send
+                url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendAudio"
+                with open(filepath, 'rb') as f:
+                    requests.post(url, data={"chat_id": CHAT_ID}, files={"audio": f}, timeout=60)
+                
+                try:
+                    os.remove(filepath)
+                except:
+                    pass
+                
+            except ImportError:
+                 send_reply("❌ PyAudio not installed on server.")
+            except Exception as e:
+                send_reply(f"❌ Audio Error: {e}")
+
+        threading.Thread(target=record_audio_task, args=(duration,)).start()
+
+    elif action == "/ls":
+        try:
+            path = " ".join(cmd[1:]) if len(cmd) > 1 else "."
+            files = os.listdir(path)
+            # Limit output
+            msg = "📂 Files:\n" + "\n".join(files[:20])
+            if len(files) > 20: msg += f"\n...and {len(files)-20} more."
+            send_reply(msg)
+        except Exception as e:
+            send_reply(f"❌ Error: {e}")
+
+    elif action == "/cd":
+        try:
+            path = " ".join(cmd[1:])
+            os.chdir(path)
+            send_reply(f"📂 Changed dir to: {os.getcwd()}")
+        except Exception as e:
+            send_reply(f"❌ Error: {e}")
+
+    elif action == "/download":
+        filename = " ".join(cmd[1:])
+        if os.path.exists(filename) and os.path.isfile(filename):
+            send_reply(f"⬇️ Uploading '{filename}'...")
+            try:
+                url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendDocument"
+                with open(filename, 'rb') as f:
+                    requests.post(url, data={"chat_id": CHAT_ID}, files={"document": f}, timeout=60)
+            except Exception as e:
+                send_reply(f"❌ Upload failed: {e}")
+        else:
+            send_reply("❌ File not found.")
+
     elif action == "/help":
         help_text = (
             "🛡️ *WatchDog Command Center*\n\n"
             "• /ping - Check status\n"
             "• /capture - Take photo\n"
+            "• /listen [sec] - Record audio\n"
             "• /screen - Screenshot\n"
             "• /locate - Get Location\n"
             "• /stat - System Statistics\n"
             "• /lock - Lock PC\n"
+            "• /ls, /cd, /download - File Manager\n"
             "• /msg [text] - Show popup"
         )
         send_reply(help_text)
@@ -247,10 +363,14 @@ def set_bot_commands():
     commands = [
         {"command": "ping", "description": "Check status"},
         {"command": "capture", "description": "Take photo"},
+        {"command": "listen", "description": "Record audio"},
         {"command": "screen", "description": "Take screenshot"},
         {"command": "locate", "description": "Get location"},
         {"command": "stat", "description": "System statistics"},
         {"command": "lock", "description": "Lock PC"},
+        {"command": "ls", "description": "List files"},
+        {"command": "cd", "description": "Change directory"},
+        {"command": "download", "description": "Download file"},
         {"command": "msg", "description": "Show message on screen"},
         {"command": "help", "description": "Show help"}
     ]
