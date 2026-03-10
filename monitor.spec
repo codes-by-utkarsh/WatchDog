@@ -6,7 +6,11 @@ a = Analysis(
     pathex=['.'],
     binaries=[],
     datas=[],
+<<<<<<< HEAD
     hiddenimports=['pyautogui', 'PIL', 'service.commander', 'service.camera', 'psutil', 'pyaudio'],
+=======
+    hiddenimports=['pyautogui', 'PIL', 'service.commander', 'service.camera'],
+>>>>>>> origin/main
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -22,7 +26,11 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
+<<<<<<< HEAD
     name='WatchDog',
+=======
+    name='monitor_payload',
+>>>>>>> origin/main
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
